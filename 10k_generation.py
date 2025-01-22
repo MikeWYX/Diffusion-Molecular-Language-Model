@@ -15,6 +15,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--topk", default=30, type=int, required=False)
 parser.add_argument("--step_size", default=2, type=int, required=False)
 parser.add_argument("--name", default='token_freq_D3PM', type=str, required=False)
+parser.add_argument("--temperature", default=0.3, type=float, required=False)
 args = parser.parse_args()
 
 step_size = args.step_size
@@ -27,7 +28,7 @@ schedule = 'mutual'
 topk = args.topk
 iteration = 1
 name = args.name
-temperature = 0.3
+temperature = args.temperature
 # seq_length = 37
 # shape = torch.Size([1000, seq_length])
 
@@ -149,37 +150,32 @@ with open('generation_distribution.json', 'r') as f:
 for seq_length, num_samples in generation_dist.items():
     if num_samples == 0:
         continue
-    output_file = f'./generation_molecules/{name}_length_{seq_length}_temperature_{temperature}.txt'
-    curve_file = f'./generation_results/{name}_length_{seq_length}_temperature_{temperature}_curve.txt'
+    output_file = f'./generation_molecules/{name}/temperature_{temperature}/length_{seq_length}.txt'
     shape = [num_samples, seq_length]
     with open(output_file, 'w') as fdata:
-        with open(curve_file, 'w') as fcurve:
-            with torch.no_grad():
-                for i in tqdm(range(iteration)):
-                    start = time.time()
-                    state = diffusion.discrete_diffusion_predict_fn(
-                        shape=shape,
-                        denoise_fn=denoise_fn,
-                        diffusion=diffusion_instance,
-                        predict_x0=predict_x0,
-                        sample_cls=sample_cls,
-                        step_size=step_size,
-                        topk=topk,
-                        target_mask=torch.ones(shape, device=device),
-                        show_process=False,
-                        temperature=temperature
-                        # word_freq=True
-                        # context_fn=context_fn
-                    )['final_state']
-                    t = time.time() - start
-                    print(t, file=fcurve, end=' ')
-                    molecule = tokenizer.batch_decode(state)
-                    all_molecules.extend(molecule)
-                    # print(sentence)
-                    for s in molecule:
-                        print(s, file=fdata, flush=True)
+        with torch.no_grad():
+            for i in tqdm(range(iteration)):
+                state = diffusion.discrete_diffusion_predict_fn(
+                    shape=shape,
+                    denoise_fn=denoise_fn,
+                    diffusion=diffusion_instance,
+                    predict_x0=predict_x0,
+                    sample_cls=sample_cls,
+                    step_size=step_size,
+                    topk=topk,
+                    target_mask=torch.ones(shape, device=device),
+                    show_process=False,
+                    temperature=temperature
+                    # word_freq=True
+                    # context_fn=context_fn
+                )['final_state']
+                molecule = tokenizer.batch_decode(state)
+                all_molecules.extend(molecule)
+                # print(sentence)
+                for s in molecule:
+                    print(s, file=fdata, flush=True)
 
-all_output_file = f'./generation_molecules/{name}_10k_samples.txt'
+all_output_file = f'./generation_molecules/{name}/temperature_{temperature}/all_10k_samples.txt'
 with open(all_output_file, 'w') as f:
     for mol in all_molecules:
         f.write(mol + '\n')
