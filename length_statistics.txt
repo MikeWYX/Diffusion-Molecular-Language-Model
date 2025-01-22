@@ -1,0 +1,31 @@
+Sequence Length Statistics:
+mean: 37.17
+median: 37.00
+std: 8.60
+min: 7.00
+max: 72.00
+percentile_95: 52.00
+percentile_99: 58.00
+
+Percentile Information:
+0th percentile: 7.00
+5th percentile: 23.00
+10th percentile: 26.00
+15th percentile: 28.00
+20th percentile: 30.00
+25th percentile: 31.00
+30th percentile: 33.00
+35th percentile: 34.00
+40th percentile: 35.00
+45th percentile: 36.00
+50th percentile: 37.00
+55th percentile: 38.00
+60th percentile: 39.00
+65th percentile: 40.00
+70th percentile: 41.00
+75th percentile: 43.00
+80th percentile: 44.00
+85th percentile: 46.00
+90th percentile: 48.00
+95th percentile: 52.00
+100th percentile: 72.00
