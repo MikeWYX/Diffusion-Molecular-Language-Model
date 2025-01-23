@@ -77,7 +77,7 @@ class Zinc250kLoader:
         # Select subset for this split
         dataset = self.dataset.select(split_idx)
         
-        print(f'Example in {split} set:')
+        print(f'Example in Zinc250k {split} set:')
         print(dataset[0])
         
         # Process features
@@ -112,32 +112,15 @@ class Zinc250kLoader:
 class NPLoader:
     def __init__(self, tokenizer):
         self.tokenizer = tokenizer
-        
-    def _get_splits(self):        
-        # Load test indices
-        selfies_list = self.dataset['selfies']
-        with open('/NAS/luoyc/wuyux/data/zinc250k/valid_idx_zinc250k.json') as f:
-            test_idx = np.array(json.load(f))    
-        # Calculate train indices
-        train_idx = np.array(list(set(np.arange(len(selfies_list))).difference(set(test_idx))))
-       
-        return {
-            'train': train_idx.tolist(),
-            'test': test_idx.tolist()
-        }
 
     def _load_train(self):
-        # Get split indices
-        splits = self._get_splits()
-        split_idx = splits['train']
-        # Select subset for this split
-        dataset = self.dataset.select(split_idx)
+        dataset = datasets.load_dataset('/NAS/luoyc/wuyux/data/natural_product/np_train.csv', split="train")
         
-        print(f'Example in {split} set:')
+        print(f'Example in Natural Product train set:')
         print(dataset[0])
         
         # Process features
-        removed_columns = ['index', 'smiles', 'selfies', 'logP', 'qed', 'SAS']
+        removed_columns = ['smiles', 'selfies']
         dataset = dataset.map(
             partial(self.convert_to_features, tokenizer=self.tokenizer), 
             batched=True, 
@@ -146,9 +129,9 @@ class NPLoader:
         return dataset
 
     def _load_test(self):
-        splits = self._get_splits()
-        split_idx = splits['test']
-        dataset = self.dataset.select(split_idx)
+        dataset = datasets.load_dataset('/NAS/luoyc/wuyux/data/natural_product/np_test.csv', split="test")
+        print(f'Example in Natural Product test set:')
+        print(dataset[0])
         return dataset
 
     @staticmethod
