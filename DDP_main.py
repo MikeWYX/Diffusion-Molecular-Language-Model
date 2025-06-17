@@ -4,10 +4,7 @@ import random
 import numpy as np
 import argparse
 import torch
-# import fitlog
 from dataloader import DiffusionLoader
-# from transformers import BertTokenizer, BertConfig, RobertaTokenizer, RobertaConfig
-# from models.modeling_roberta import RobertaForMaskedLM
 from transformers import AutoTokenizer, AutoConfig, BartForConditionalGeneration
 import diffusion_word_freq
 from torch.optim import AdamW
@@ -69,51 +66,21 @@ if __name__ == '__main__':
     dist.init_process_group(backend='nccl', timeout=datetime.timedelta(seconds=9600))
 
     set_seed(args)
-    # if args.timestep in ['none', 'token']:
-    #     from models.modeling_bert import BertForMaskedLM
-    # elif args.timestep == 'layerwise':
-    #     from models.modeling_bert_new_timestep import BertForMaskedLM
-    # else:
-    #     raise NotImplementedError
-
-    # if dist.get_rank() == 0:
-    #     log_dir = './logs'
-    #     fitlog.set_log_dir(log_dir)
-    #     fitlog.commit(__file__)
-    #     fitlog.add_hyper(args)
-    #     fitlog.add_hyper_in_file(__file__)
-
     save_path = f'./model_name_MolGen-large-random_lr_{args.lr}_seed_{args.seed}_numsteps_{args.num_steps}_sample_{args.sample_strategy}_schedule_{args.schedule}_hybridlambda_{args.hybrid_lambda}_wordfreqlambda_{args.word_freq_lambda}_fromscratch_{args.from_scratch}_timestep_{args.timestep}_ckpts'
-    # if args.model_name_or_path in ['/data/wuyux/bert-base-uncased', '/data/wuyux/bert-large-uncased']:
-    #     model_cls = BertForMaskedLM
-    #     cfg_cls = BertConfig
-    #     tok_cls = BertTokenizer
-    # elif args.model_name_or_path in ['/data/wuyux/roberta-base']:
-    #     model_cls = RobertaForMaskedLM
-    #     cfg_cls = RobertaConfig
-    #     tok_cls = RobertaTokenizer
-    # else:
-    #     raise NotImplementedError
-
-
     tokenizer = AutoTokenizer.from_pretrained('/NAS/luoyc/wuyux/data/MolGen-large')
     word_freq = torch.load(f'./token_freq/MolGen-large_zinc250k.pt')
     assert word_freq.size(0) == len(tokenizer)
-
 
     def word_freq_preprocess_fn(wf):
         wf = wf + 1
         wf = wf.log()
         wf = wf / wf.max()
-
-        # range: 0 - 1
         return wf
 
     def process_fn_in_collate(wf):
         return wf - wf.mean()
 
     word_freq = word_freq_preprocess_fn(word_freq)
-
     word_freq[tokenizer.pad_token_id] = 0.  # stable training
 
     if args.sample_strategy == 'Categorical':
@@ -138,14 +105,6 @@ if __name__ == '__main__':
         ckpt = torch.load('model_name_/MolGen-large_lr_5e-05_seed_42_numsteps_2048_sample_Categorical_schedule_mutual_hybridlambda_0.01_wordfreqlambda_0.3_fromscratch_True_timestep_layerwise_ckpts/best(44999).th')
     cfg = AutoConfig.from_pretrained('/NAS/luoyc/wuyux/data/MolGen-large')
     cfg.overall_timestep = diffusion_instance.num_steps
-
-    # if args.from_scratch:
-    #     model = model_cls(cfg).to(device)
-    # elif args.load_step <= 0:
-    #     model = model_cls.from_pretrained(args.model_name_or_path, config=cfg).to(device)
-    # else:
-    #     model = model_cls(cfg).to(device)
-    #     model.load_state_dict(ckpt['model'])
     model = BartForConditionalGeneration.from_pretrained('/NAS/luoyc/wuyux/data/MolGen-large').to(device)
     # for name, param in model.named_parameters():
     #     print(f"参数名称: {name}, 参数大小: {param.size()}, 参数元素数: {param.numel()}")
@@ -193,43 +152,9 @@ if __name__ == '__main__':
 
     cls = torch.full((1, 1), fill_value=tokenizer.cls_token_id, device=device)
     sep = torch.full((1, 1), fill_value=tokenizer.sep_token_id, device=device)
-
     att_ones = torch.ones((1, 1), device=device)
     att_zeros = torch.zeros((1, 1), device=device)
 
-    # if args.timestep == 'none':
-    #     def denoise_fn(targets, timestep, attention_mask):
-    #         assert len(targets.size()) == 2  # bsz * seqlen
-    #         bsz = targets.size(0)
-    #         targets = torch.cat((cls.repeat(bsz, 1), targets, sep.repeat(bsz, 1)), dim=1)
-    #         attention_mask = torch.cat((att_ones.repeat(bsz, 1), attention_mask, att_zeros.repeat(bsz, 1)), dim=1)
-    #         return model(input_ids=targets, attention_mask=attention_mask)['logits'][:, 1:-1, :]
-    # elif args.timestep == 'token':
-
-    #     def denoise_fn(targets, timestep, attention_mask):
-    #         assert len(targets.size()) == 2  # bsz * seqlen
-    #         bsz = targets.size(0)
-    #         targets = torch.cat((
-    #             cls.repeat(bsz, 1),
-    #             torch.full((bsz, 1), fill_value=timestep.item() + 110, device=device),
-    #             targets,
-    #             sep.repeat(bsz, 1)
-    #         ), dim=1)
-    #         attention_mask = torch.cat((att_ones.repeat(bsz, 2), attention_mask, att_zeros.repeat(bsz, 1)), dim=1)
-    #         return model(input_ids=targets, timestep=timestep - 1, attention_mask=attention_mask)['logits'][:, 2:-1, :]
-    # elif args.timestep == 'layerwise':
-    #     def denoise_fn(targets, timestep, attention_mask):
-    #         assert len(targets.size()) == 2  # bsz * seqlen
-    #         bsz = targets.size(0)
-    #         targets = torch.cat((
-    #             cls.repeat(bsz, 1),
-    #             targets,
-    #             sep.repeat(bsz, 1)
-    #         ), dim=1)
-    #         attention_mask = torch.cat((att_ones.repeat(bsz, 1), attention_mask, att_zeros.repeat(bsz, 1)), dim=1)
-    #         return model(input_ids=targets, timestep=timestep - 1, attention_mask=attention_mask)['logits'][:, 1:-1, :]
-    # else:
-    #     raise NotImplementedError
     def denoise_fn(targets, timestep, attention_mask):
         assert len(targets.size()) == 2  # bsz * seqlen
         bsz = targets.size(0)
