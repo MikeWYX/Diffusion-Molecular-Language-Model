@@ -5,7 +5,7 @@ from sample import Categorical, WholeWordMasking
 import time
 from tqdm import tqdm
 import argparse
-import diffusion_word_freq as diffusion
+import diffusion_token_freq as diffusion
 import json
 
 parser = argparse.ArgumentParser()
