@@ -3,7 +3,7 @@ from transformers import AutoTokenizer
 import torch
 from dataloader import DiffusionLoader
 import numpy as np
-import diffusion_word_freq
+import diffusion_token_freq
 import math
 from tqdm import tqdm
 
