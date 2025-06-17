@@ -6,7 +6,7 @@ import argparse
 import torch
 from dataloader import DiffusionLoader
 from transformers import AutoTokenizer, AutoConfig, BartForConditionalGeneration
-import diffusion_word_freq
+import diffusion_token_freq
 from torch.optim import AdamW
 from torch.nn.utils.rnn import pad_sequence
 import fastNLP
@@ -38,7 +38,7 @@ def parse_args():
     parser.add_argument("--lr", default=5e-4, type=float, required=False)
     parser.add_argument("--epochs", default=3, type=int, required=False)
     parser.add_argument("--batch_size", default=64, type=int, required=False)
-    parser.add_argument("--word_freq_lambda", default=0.0, type=float, required=False)
+    parser.add_argument("--token_freq_lambda", default=0.0, type=float, required=False)
     parser.add_argument("--num_steps", default=2048, type=int, required=False)
     parser.add_argument("--eval_step_size", default=4, type=int, required=False)
     parser.add_argument("--dev_size", default=5e-4, type=float, required=False)
@@ -68,10 +68,10 @@ if __name__ == '__main__':
     set_seed(args)
     save_path = f'./model_name_MolGen-large-random_lr_{args.lr}_seed_{args.seed}_numsteps_{args.num_steps}_sample_{args.sample_strategy}_schedule_{args.schedule}_hybridlambda_{args.hybrid_lambda}_wordfreqlambda_{args.word_freq_lambda}_fromscratch_{args.from_scratch}_timestep_{args.timestep}_ckpts'
     tokenizer = AutoTokenizer.from_pretrained('/NAS/luoyc/wuyux/data/MolGen-large')
-    word_freq = torch.load(f'./token_freq/MolGen-large_zinc250k.pt')
-    assert word_freq.size(0) == len(tokenizer)
+    token_freq = torch.load(f'./token_freq/MolGen-large_zinc250k.pt')
+    assert token_freq.size(0) == len(tokenizer)
 
-    def word_freq_preprocess_fn(wf):
+    def token_freq_preprocess_fn(wf):
         wf = wf + 1
         wf = wf.log()
         wf = wf / wf.max()
@@ -80,8 +80,8 @@ if __name__ == '__main__':
     def process_fn_in_collate(wf):
         return wf - wf.mean()
 
-    word_freq = word_freq_preprocess_fn(word_freq)
-    word_freq[tokenizer.pad_token_id] = 0.  # stable training
+    token_freq = token_freq_preprocess_fn(token_freq)
+    token_freq[tokenizer.pad_token_id] = 0.  # stable training
 
     if args.sample_strategy == 'Categorical':
         sample_cls = Categorical()
@@ -90,14 +90,14 @@ if __name__ == '__main__':
     else:
         raise ValueError
 
-    diffusion_schedule = diffusion_word_freq.create_discrete_diffusion_schedule(args.schedule, num_steps=args.num_steps)
-    diffusion_instance = diffusion_word_freq.MaskDiffusion(
+    diffusion_schedule = diffusion_token_freq.create_discrete_diffusion_schedule(args.schedule, num_steps=args.num_steps)
+    diffusion_instance = diffusion_token_freq.MaskDiffusion(
         dim=len(tokenizer),
         schedule=diffusion_schedule,
         tokenizer=tokenizer,
         sample_cls=sample_cls,
-        # word_freq=word_freq,
-        word_freq_lambda=args.word_freq_lambda,
+        # token_freq=token_freq,
+        token_freq_lambda=args.token_freq_lambda,
         device=device
     )
 
@@ -132,14 +132,14 @@ if __name__ == '__main__':
     def collate_fn(batch_input):
         input_ids = [torch.tensor(d['input_ids']) for d in batch_input]
         attention_mask = [torch.tensor(d['attention_mask']) for d in batch_input]
-        word_freq_logits = [process_fn_in_collate(word_freq.gather(0, torch.tensor(d['input_ids']))) for d in batch_input]
+        token_freq_logits = [process_fn_in_collate(token_freq.gather(0, torch.tensor(d['input_ids']))) for d in batch_input]
         input_ids = pad_sequence(input_ids, batch_first=True)
         attention_mask = pad_sequence(attention_mask, batch_first=True)
-        word_freq_logits = pad_sequence(word_freq_logits, batch_first=True)
+        token_freq_logits = pad_sequence(token_freq_logits, batch_first=True)
         return {
             'input_ids': input_ids,
             'attention_mask': attention_mask,
-            'word_freq_logits': word_freq_logits
+            'token_freq_logits': token_freq_logits
         }
 
 
@@ -178,7 +178,7 @@ for epoch in range(args.epochs):
     train_loader.sampler.set_epoch(epoch)
     dev_loader.sampler.set_epoch(epoch)
     for i, batch in enumerate(tqdm(train_loader), args.load_step + 1):
-        metrics = diffusion_word_freq.compute_kl_reverse_process(
+        metrics = diffusion_token_freq.compute_kl_reverse_process(
             batch['input_ids'].to(device),
             diffusion_instance.sample_t(),
             denoise_fn=denoise_fn,
@@ -186,7 +186,7 @@ for epoch in range(args.epochs):
             target_mask=batch['attention_mask'].to(device),
             hybrid_lambda=args.hybrid_lambda,
             predict_x0=args.predict_x0,
-            word_freq_logits=batch['word_freq_logits'].to(device)
+            token_freq_logits=batch['token_freq_logits'].to(device)
         )
 
         loss = metrics['loss'] / args.batch_size
@@ -227,14 +227,14 @@ for epoch in range(args.epochs):
 
             with torch.no_grad():
                 for dev_batch in dev_loader:
-                    batch_dev_metrics = diffusion_word_freq.discrete_diffusion_elbo(
+                    batch_dev_metrics = diffusion_token_freq.discrete_diffusion_elbo(
                         dev_batch['input_ids'].to(device),
                         denoise_fn=denoise_fn,
                         diffusion=diffusion_instance,
                         target_mask=dev_batch['attention_mask'].to(device),
                         normalize_without_padding=True,
                         eval_step_size=args.eval_step_size,
-                        word_freq_logits=dev_batch['word_freq_logits'].to(device),
+                        token_freq_logits=dev_batch['token_freq_logits'].to(device),
                         device=device
                     )
 
@@ -268,5 +268,3 @@ for epoch in range(args.epochs):
                         }, f'./{save_path}/best({i}).th')
                         logger.info(f'在第 {i} 步保存了新的最佳模型')
             model.train()
-
-
