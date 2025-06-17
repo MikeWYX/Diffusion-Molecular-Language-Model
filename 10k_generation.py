@@ -1,12 +1,9 @@
 import torch
 import os
-# from transformers import BertTokenizer, BertConfig
 from transformers import AutoTokenizer, AutoConfig, BartForConditionalGeneration
 from sample import Categorical, WholeWordMasking
 import time
 from tqdm import tqdm
-# from compute_metric import bleu, self_bleu
-# import nltk
 import argparse
 import diffusion_word_freq as diffusion
 import json
@@ -60,14 +57,12 @@ elif kind == 'base':
 else:
     raise ValueError
 
-# import diffusion_word_freq as diffusion
 word_freq = torch.load(f'./token_freq/MolGen-large_zinc250k.pt', weights_only=True).to(device)
 def word_freq_preprocess_fn(wf):
     wf = wf + 1
     wf = wf.log()
     wf = wf / wf.max()
 
-    # range: 0 - 1
     return wf
 
 word_freq = word_freq_preprocess_fn(word_freq)
@@ -138,8 +133,6 @@ elif timestep in ['layerwise', 'embedding']:
         )['logits'][:, 1:-1, :]
 else:
     raise NotImplementedError
-# att_ones = torch.ones((1, 1), device=device)
-# att_zeros = torch.zeros((1, 1), device=device)
 
 all_molecules = []
 model.eval()
