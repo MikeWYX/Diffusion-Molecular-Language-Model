@@ -5,7 +5,25 @@
 
 ---
 
-### 简介 (Introduction)
+### Introduction
+
+This project is the code implementation for the thesis **Research on Molecular Generation Methods Based on Diffusion Language Models**。
+
+Traditional molecular generation methods, when dealing with 1D string representations like SMILES or SELFIES, often employ **Autoregressive** models (such as RNNs or Transformer decoders). These models generate tokens sequentially, assuming that the generation of the current token strictly depends on its preceding sequence. However, a molecule's chemical structure is inherently a graph, where dependencies between atoms are global and non-local. When this structure is forcibly mapped into a linear sequence, its intrinsic dependencies become complex and **Non-Autoregressive**. The conventional left-to-right generation approach struggles to effectively capture the molecule's overall topology and long-range constraints (like ring closures).
+
+To address this challenge, we propose a new non-autoregressive paradigm for molecular generation—**DMLM (Diffusion Molecular Language Model)**. Our core idea is:
+
+-   **Abandon Autoregression, Embrace Iterative Global Generation**: Instead of generating tokens one by one, we treat the entire molecular sequence as a whole. Using the framework of diffusion models, the model starts from a completely noised sequence (all [MASK]) and, through multiple iterative steps, refines and denoises all positions in the sequence **in parallel and globally** until the complete SELFIES molecular string is recovered. This iterative, global generation process better aligns with the holistic nature of molecular structures and can better capture their non-local dependencies.
+
+-   **Inspired by DiffusionBERT**: Our method is inspired by the success of **DiffusionBERT** in the text generation domain. DiffusionBERT demonstrated that diffusion models can serve as powerful non-autoregressive text generators. We successfully transfer this idea to the molecular generation field and design key modules adapted to the characteristics of SELFIES:
+    -   **Spindle Noise Schedule**: Denoising is performed differentially based on the information content of SELFIES tokens.
+    -   **Time-Agnostic Decoding**: Simplifies model design and efficiently utilizes pre-trained knowledge.
+      
+-   **Integrating MOLGEN Pre-trained Knowledge**: We use the powerful pre-trained model **MOLGEN** as the core denoising network. Its bidirectional contextual understanding capability is key to achieving global parallel denoising.
+
+Experiments show that DMLM performs exceptionally well on the MOSES benchmark dataset, achieving SOTA (State-Of-The-Art) levels in validity, novelty, uniqueness, and stability, validating the effectiveness of the non-autoregressive generation paradigm.
+
+### 简介 
 
 本项目是论文 **《基于扩散语言模型的分子生成方法研究》** 的代码实现。
 
